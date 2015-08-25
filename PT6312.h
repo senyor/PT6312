@@ -51,7 +51,7 @@
  *
  *   while (1) {
  *    // Check and read keydata
- *    if (PT6312.readKeys(&keydata)) {
+ *    if (PT6312.getKeys(&keydata)) {
  *      pc.printf("Keydata 0..2 = 0x%02x 0x%02x 0x%02x\r\n", keydata[0], keydata[1], keydata[2]);
  *
  *      if (keydata[0] == 0x10) { //sw2   
@@ -156,7 +156,7 @@ class PT6312 {
   typedef char DisplayData_t[PT6312_DISPLAY_MEM];
   typedef char KeyData_t[PT6312_KEY_MEM];
     
- /** Constructor for class for driving Princeton PT6312 LED controller
+ /** Constructor for class for driving Princeton PT6312 VFD controller
   *
   * @brief Supports 4 Digits of 16 Segments upto 11 Digits of 11 Segments. Also supports a scanned keyboard of upto 24 keys, 4 switches and 4 LEDs.
   *        SPI bus interface device.   
@@ -191,7 +191,7 @@ class PT6312 {
    *       but this may result in some spurious keys also being set in keypress data array.
    *       It may be best to ignore all keys in those situations. That option is implemented in this method depending on #define setting.
    */   
-  bool readKeys(KeyData_t *keydata);
+  bool getKeys(KeyData_t *keydata);
 
 
   /** Read switches from PT6312
@@ -200,7 +200,7 @@ class PT6312 {
    *  @return char for switch data (4 least significant bits)
    *
    */   
-  char readSwitches();
+  char getSwitches();
 
   /** Set LEDs
     *
@@ -247,6 +247,67 @@ class PT6312 {
     *  @return none
     */ 
   void _writeCmd(int cmd, int data);  
+};
+
+
+
+/** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVD625
+  *
+  * @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
+  *        SPI bus interface device.   
+  *  @param  PinName mosi, miso, sclk, cs SPI bus pins
+  */
+class PT6312_DVD625 : public PT6312, public Stream {
+ public:
+
+ /** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVD625
+   *
+   * @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
+   *        SPI bus interface device.   
+   * @param  PinName mosi, miso, sclk, cs SPI bus pins
+   */
+  PT6312_DVD625(PinName mosi, PinName miso, PinName sclk, PinName cs);
+
+#if DOXYGEN_ONLY
+    /** Write a character to the LCD
+     *
+     * @param c The character to write to the display
+     */
+    int putc(int c);
+
+    /** Write a formatted string to the LCD
+     *
+     * @param format A printf-style format string, followed by the
+     *               variables to use in formatting the string.
+     */
+    int printf(const char* format, ...);   
+#endif
+
+     /** Locate cursor to a screen column
+     *
+     * @param column  The horizontal position from the left, indexed from 0
+     */
+    void locate(int column);
+    
+    /** Clear the screen and locate to 0
+     */
+    void cls();
+
+   /** Number of screen columns
+    *
+    * @param none
+    * @return columns
+    */
+    int columns();   
+
+protected:  
+    // Stream implementation functions
+    virtual int _putc(int value);
+    virtual int _getc();
+
+private:
+    int _column;
+    int _columns;    
 };
 
 #endif

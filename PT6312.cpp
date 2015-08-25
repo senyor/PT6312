@@ -21,6 +21,7 @@
  */
 #include "mbed.h" 
 #include "PT6312.h"
+#include "Font_16Seg.h"
 
 /** Constructor for class for driving Princeton PT6312 VFD controller
  *
@@ -44,7 +45,8 @@ void PT6312::_init(){
 //init SPI
   _cs=1;
   _spi.format(8,3); //PT6312 uses mode 3 (Clock High on Idle, Data latched on second (=rising) edge)
-  _spi.frequency(100000);   
+//  _spi.frequency(100000);   
+  _spi.frequency(500000);     
 
 //init controller  
   _writeCmd(PT6312_MODE_SET_CMD, _mode);                                               // Mode set command
@@ -146,7 +148,7 @@ void PT6312::writeData(DisplayData_t data) {
   *       but this may also result in some spurious keys being set in keypress data array.
   *       It may be best to ignore all keys in those situations. That option is implemented in this method depending on #define setting.  
   */ 
-bool PT6312::readKeys(KeyData_t *keydata) {
+bool PT6312::getKeys(KeyData_t *keydata) {
   int keypress = 0;
   char data;
 
@@ -191,7 +193,7 @@ bool PT6312::readKeys(KeyData_t *keydata) {
   *  @return char for switch data (4 least significant bits) 
   *
   */   
-char PT6312::readSwitches() {
+char PT6312::getSwitches() {
   char data;
 
   // Read switches
@@ -275,3 +277,94 @@ void PT6312::_writeCmd(int cmd, int data){
 };  
 
 
+
+/** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVD625
+  *
+  * @brief Supports 4 Digits of 16 Segments upto 11 Digits of 11 Segments. Also supports a scanned keyboard of upto 24 keys, 4 switches and 4 LEDs.
+  *        SPI bus interface device.   
+  *  @param  PinName mosi, miso, sclk, cs SPI bus pins
+  */
+PT6312_DVD625::PT6312_DVD625(PinName mosi, PinName miso, PinName sclk, PinName cs) : PT6312(mosi, miso, sclk, cs, Dig7_Seg15) {
+  _column = 0;
+  _columns = 7;    
+}  
+
+#if(0)
+#if DOXYGEN_ONLY
+    /** Write a character to the LCD
+     *
+     * @param c The character to write to the display
+     */
+    int putc(int c);
+
+    /** Write a formatted string to the LCD
+     *
+     * @param format A printf-style format string, followed by the
+     *               variables to use in formatting the string.
+     */
+    int printf(const char* format, ...);   
+#endif
+#endif
+
+/** Locate cursor to a screen column
+  *
+  * @param column  The horizontal position from the left, indexed from 0
+  */
+void PT6312_DVD625::locate(int column) {
+}
+
+
+/** Number of screen columns
+  *
+  * @param none
+  * @return columns
+  */
+int PT6312_DVD625::columns() {
+    return _columns;
+}
+
+    
+/** Clear the screen and locate to 0
+  */
+void PT6312_DVD625::cls() {
+  PT6312::cls();    
+}    
+
+
+/** Write a single character (Stream implementation)
+  */
+int PT6312_DVD625::_putc(int value) {
+  int addr;
+    
+    if (value == '\n') {
+      //No character to write
+      
+      //Update Cursor      
+      _column = 0;
+    }
+    else {
+      //Character to write
+      value = value - 'A';
+      addr = ((_columns - 1) - _column) * 2;      
+      PT6312::writeData(addr, font_16A[value][0]);
+      PT6312::writeData(addr + 1, font_16A[value][1]);
+
+      //Update Cursor
+      _column++;
+      if (_column >= columns()) {
+        _column = 0;
+      }          
+    } //else
+
+//    //Set next memoryaddress, make sure cursor blinks at next location
+//    addr = getAddress(_column, _row);
+//    _writeCommand(0x80 | addr);
+            
+    return value;
+}
+
+
+// get a single character (Stream implementation)
+int PT6312_DVD625::_getc() {
+    return -1;
+}
