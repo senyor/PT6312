@@ -178,9 +178,10 @@ class PT6312 {
  
   /** Write Display datablock to PT6312
    *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=16) bytes for displaydata (starting at address 0)
+   *  @param  length number bytes to write (valide range 0..PT6312_DISPLAY_MEM (=16), starting at address 0)   
    *  @return none
    */   
-  void writeData(DisplayData_t data);
+  void writeData(DisplayData_t data, int length = PT6312_DISPLAY_MEM);
 
 
   /** Read keydata block from PT6312
@@ -251,22 +252,24 @@ class PT6312 {
 
 
 
-/** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVD625
+#define DVP630_NR_DIGITS 7
+
+/** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVP630
   *
   * @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
   *        SPI bus interface device.   
   *  @param  PinName mosi, miso, sclk, cs SPI bus pins
   */
-class PT6312_DVD625 : public PT6312, public Stream {
+class PT6312_DVP630 : public PT6312, public Stream {
  public:
 
- /** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVD625
+ /** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVP630
    *
    * @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
    *        SPI bus interface device.   
    * @param  PinName mosi, miso, sclk, cs SPI bus pins
    */
-  PT6312_DVD625(PinName mosi, PinName miso, PinName sclk, PinName cs);
+  PT6312_DVP630(PinName mosi, PinName miso, PinName sclk, PinName cs);
 
 #if DOXYGEN_ONLY
     /** Write a character to the LCD
@@ -300,6 +303,16 @@ class PT6312_DVD625 : public PT6312, public Stream {
     */
     int columns();   
 
+  /** Write Display datablock to PT6312
+   *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=16) bytes for displaydata (starting at address 0)
+   *  @param  length number bytes to write (valide range 0..DVP630_NR_DIGITS*2 (=14), starting at address 0)   
+   *  @return none
+   */   
+  void writeData(DisplayData_t data, int length = (DVP630_NR_DIGITS*2)) {
+    PT6312::writeData(data, length);
+  }  
+
+
 protected:  
     // Stream implementation functions
     virtual int _putc(int value);
@@ -307,7 +320,9 @@ protected:
 
 private:
     int _column;
-    int _columns;    
+    int _columns;   
+    
+    DisplayData_t _displaybuffer;
 };
 
 #endif

@@ -124,14 +124,20 @@ void PT6312::writeData(int address, char data) {
 
 /** Write Display datablock to PT6312
   *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=16) bytes for displaydata (starting at address 0)
+  *  @param  length number bytes to write (valide range 0..PT6312_DISPLAY_MEM (=16), starting at address 0)     
   *  @return none
   */ 
-void PT6312::writeData(DisplayData_t data) {
+void PT6312::writeData(DisplayData_t data, int length) {
   _cs=0;
   wait_us(1);    
   _spi.write(_flip(PT6312_ADDR_SET_CMD | 0x00)); // Set Address at 0
       
-  for (int idx=0; idx<PT6312_DISPLAY_MEM; idx++) {
+// sanity check
+  if (length < 0) {length = 0;}
+  if (length > PT6312_DISPLAY_MEM) {length = PT6312_DISPLAY_MEM;}
+
+//  for (int idx=0; idx<PT6312_DISPLAY_MEM; idx++) {  
+  for (int idx=0; idx<length; idx++) {    
     _spi.write(_flip(data[idx])); // data 
   }
   
@@ -278,15 +284,15 @@ void PT6312::_writeCmd(int cmd, int data){
 
 
 
-/** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVD625
+/** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVP630
   *
   * @brief Supports 4 Digits of 16 Segments upto 11 Digits of 11 Segments. Also supports a scanned keyboard of upto 24 keys, 4 switches and 4 LEDs.
   *        SPI bus interface device.   
   *  @param  PinName mosi, miso, sclk, cs SPI bus pins
   */
-PT6312_DVD625::PT6312_DVD625(PinName mosi, PinName miso, PinName sclk, PinName cs) : PT6312(mosi, miso, sclk, cs, Dig7_Seg15) {
-  _column = 0;
-  _columns = 7;    
+PT6312_DVP630::PT6312_DVP630(PinName mosi, PinName miso, PinName sclk, PinName cs) : PT6312(mosi, miso, sclk, cs, Dig7_Seg15) {
+  _column  = 0;
+  _columns = DVP630_NR_DIGITS;    
 }  
 
 #if(0)
@@ -310,7 +316,12 @@ PT6312_DVD625::PT6312_DVD625(PinName mosi, PinName miso, PinName sclk, PinName c
   *
   * @param column  The horizontal position from the left, indexed from 0
   */
-void PT6312_DVD625::locate(int column) {
+void PT6312_DVP630::locate(int column) {
+  //sanity check
+  if (column < 0) {column = 0;}
+  if (column > (_columns - 1)) {column = _columns - 1;}  
+  
+  _column = column;       
 }
 
 
@@ -319,21 +330,28 @@ void PT6312_DVD625::locate(int column) {
   * @param none
   * @return columns
   */
-int PT6312_DVD625::columns() {
+int PT6312_DVP630::columns() {
     return _columns;
 }
 
     
 /** Clear the screen and locate to 0
   */
-void PT6312_DVD625::cls() {
-  PT6312::cls();    
+void PT6312_DVP630::cls() {
+  PT6312::cls();
+  
+  //clear local buffer
+  for (int idx=0; idx < (DVP630_NR_DIGITS*2); idx++) {
+    _displaybuffer[idx] = 0x00;  
+  }
+  
+  _column = 0;   
 }    
 
 
 /** Write a single character (Stream implementation)
   */
-int PT6312_DVD625::_putc(int value) {
+int PT6312_DVP630::_putc(int value) {
   int addr;
     
     if (value == '\n') {
@@ -342,13 +360,20 @@ int PT6312_DVD625::_putc(int value) {
       //Update Cursor      
       _column = 0;
     }
-    else {
+//    else if ((value >= 0) && (value <= 7)) {
+//      //write UDC
+//      //@todo
+//    }  
+    else if ((value >= FONT_16S_START) && (value <= FONT_16S_END)) {   
       //Character to write
-      value = value - 'A';
-      addr = ((_columns - 1) - _column) * 2;      
-      PT6312::writeData(addr, font_16A[value][0]);
-      PT6312::writeData(addr + 1, font_16A[value][1]);
-
+      value = value - FONT_16S_START;
+      addr = ((DVP630_NR_DIGITS-1) - _column) * 2; 
+      
+//save icons...
+      _displaybuffer[addr]   = FONT_16S[value][0];      
+      _displaybuffer[addr+1] = FONT_16S[value][1];      
+      writeData(_displaybuffer, (DVP630_NR_DIGITS*2));
+               
       //Update Cursor
       _column++;
       if (_column >= columns()) {
@@ -365,6 +390,6 @@ int PT6312_DVD625::_putc(int value) {
 
 
 // get a single character (Stream implementation)
-int PT6312_DVD625::_getc() {
+int PT6312_DVP630::_getc() {
     return -1;
 }
