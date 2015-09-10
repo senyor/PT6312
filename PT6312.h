@@ -23,10 +23,17 @@
 #ifndef PT6312_H
 #define PT6312_H
 
+#include "Font_16Seg.h"
+
 /** An interface for driving Princeton PT6312 VFD controller
  *
  * @code
+ *
+ * #if(1)
+ * // Direct driving of PT6312 Test
+ *
  * #include "mbed.h"
+ * #include "PT6312.h" 
  * 
  * DisplayData_t size is 8 bytes (4 digits max 16 segments) ... 22 bytes (11 digits at max 11 segments) 
  * DisplayData_t size default is 14 bytes (7 digits max 15 segments) 
@@ -61,6 +68,37 @@
  *    } 
  *   }   
  * }
+ *
+ * #else
+ *
+ * //Philips DVP630 Display Test 
+ *
+ * #include "mbed.h"
+ * #include "PT6312.h"
+ *
+ * // KeyData_t size is 3 bytes  
+ * PT6312::KeyData_t keydata; 
+ *
+ * // PT6312_DVD declaration (7 Digits, 15 Segments)
+ * PT6312_DVP630 DVP630(p5,p6,p7, p8);
+ *
+ * int main() {
+ *
+ *  DVP630.cls(); 
+ *  DVP630.setBrightness(PT6312_BRT7); 
+ *   
+ * //test to show all chars
+ *
+ *  for (int i=0x20; i<0x80; i++) {
+ *    DVP630.cls(); 
+ *    DVP630.printf("0x%2X=%c", i, (char) i);
+ *    wait(0.2);
+ * //  pc.getc();
+ *  } 
+ * }
+ *
+ * #endif
+ *
  * @endcode
  */
 
@@ -177,8 +215,8 @@ class PT6312 {
   void writeData(int address, char data); 
  
   /** Write Display datablock to PT6312
-   *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=16) bytes for displaydata (starting at address 0)
-   *  @param  length number bytes to write (valide range 0..PT6312_DISPLAY_MEM (=16), starting at address 0)   
+   *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=22) bytes for displaydata (starting at address 0)
+   *  @param  length number bytes to write (valid range 0..PT6312_DISPLAY_MEM (=22), starting at address 0)   
    *  @return none
    */   
   void writeData(DisplayData_t data, int length = PT6312_DISPLAY_MEM);
@@ -251,22 +289,34 @@ class PT6312 {
 };
 
 
+// Derived class for PT6312 used in Philips DVP630 front display unit
+//
 
 #define DVP630_NR_DIGITS 7
+#define DVP630_NR_UDC    8
 
 /** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVP630
   *
-  * @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
-  *        SPI bus interface device.   
+  *  @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
+  *  
   *  @param  PinName mosi, miso, sclk, cs SPI bus pins
   */
 class PT6312_DVP630 : public PT6312, public Stream {
  public:
 
+  /** Enums for Icons */
+  //  Digit encoded in 16 MSBs, Icon pattern encoded in 16 LSBs
+  enum Icon {
+    Dig2_Col  = (2<<16) | S_COL,
+    Dig4_Col  = (4<<16) | S_COL
+  };
+  
+  typedef char UDCData_t[DVP630_NR_UDC][2];
+  
  /** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVP630
    *
    * @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
-   *        SPI bus interface device.   
+   *  
    * @param  PinName mosi, miso, sclk, cs SPI bus pins
    */
   PT6312_DVP630(PinName mosi, PinName miso, PinName sclk, PinName cs);
@@ -296,6 +346,28 @@ class PT6312_DVP630 : public PT6312, public Stream {
      */
     void cls();
 
+    /** Set Icon
+     *
+     * @param Icon icon Enums Icon has Digit position encoded in 16 MSBs, Icon pattern encoded in 16 LSBs
+     * @return none
+     */
+    void setIcon(Icon icon);
+
+    /** Clr Icon
+     *
+     * @param Icon icon Enums Icon has Digit position encoded in 16 MSBs, Icon pattern encoded in 16 LSBs
+     * @return none
+     */
+    void clrIcon(Icon icon);
+
+   /** Set User Defined Characters (UDC)
+     *
+     * @param unsigned char udc_idx   The Index of the UDC (0..7)
+     * @param int udc_data            The bitpattern for the UDC (16 bits)       
+     */
+    void setUDC(unsigned char udc_idx, int udc_data);
+
+
    /** Number of screen columns
     *
     * @param none
@@ -303,15 +375,14 @@ class PT6312_DVP630 : public PT6312, public Stream {
     */
     int columns();   
 
-  /** Write Display datablock to PT6312
-   *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=16) bytes for displaydata (starting at address 0)
-   *  @param  length number bytes to write (valide range 0..DVP630_NR_DIGITS*2 (=14), starting at address 0)   
-   *  @return none
-   */   
-  void writeData(DisplayData_t data, int length = (DVP630_NR_DIGITS*2)) {
-    PT6312::writeData(data, length);
-  }  
-
+   /** Write Display datablock to PT6312
+    *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=22) bytes for displaydata (starting at address 0)
+    *  @param  length number bytes to write (valid range 0..(DVP630_NR_DIGITS*2) (=14), starting at address 0)   
+    *  @return none
+    */   
+    void writeData(DisplayData_t data, int length = (DVP630_NR_DIGITS*2)) {
+      PT6312::writeData(data, length);
+    }  
 
 protected:  
     // Stream implementation functions
@@ -323,6 +394,7 @@ private:
     int _columns;   
     
     DisplayData_t _displaybuffer;
+    UDCData_t _UDC_16S; 
 };
 
 #endif

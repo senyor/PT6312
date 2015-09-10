@@ -123,8 +123,8 @@ void PT6312::writeData(int address, char data) {
 }
 
 /** Write Display datablock to PT6312
-  *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=16) bytes for displaydata (starting at address 0)
-  *  @param  length number bytes to write (valide range 0..PT6312_DISPLAY_MEM (=16), starting at address 0)     
+  *  @param  DisplayData_t data Array of PT6312_DISPLAY_MEM (=22) bytes for displaydata (starting at address 0)
+  *  @param  length number bytes to write (valid range 0..PT6312_DISPLAY_MEM (=22), starting at address 0)     
   *  @return none
   */ 
 void PT6312::writeData(DisplayData_t data, int length) {
@@ -274,7 +274,7 @@ void PT6312::_writeCmd(int cmd, int data){
     
   _cs=0;
   wait_us(1);    
-//  _spi.write(_flip( (cmd & 0xF0) | (data & 0x0F)));  
+ 
   _spi.write(_flip( (cmd & PT6312_CMD_MSK) | (data & ~PT6312_CMD_MSK)));   
  
   wait_us(1);
@@ -286,8 +286,8 @@ void PT6312::_writeCmd(int cmd, int data){
 
 /** Constructor for class for driving Princeton PT6312 VFD controller as used in Philips DVP630
   *
-  * @brief Supports 4 Digits of 16 Segments upto 11 Digits of 11 Segments. Also supports a scanned keyboard of upto 24 keys, 4 switches and 4 LEDs.
-  *        SPI bus interface device.   
+  *  @brief Supports 7 Digits of 15 Segments. Also supports a scanned keyboard of 3 keys, 3 switches and 1 LED.
+  *   
   *  @param  PinName mosi, miso, sclk, cs SPI bus pins
   */
 PT6312_DVP630::PT6312_DVP630(PinName mosi, PinName miso, PinName sclk, PinName cs) : PT6312(mosi, miso, sclk, cs, Dig7_Seg15) {
@@ -338,53 +338,122 @@ int PT6312_DVP630::columns() {
 /** Clear the screen and locate to 0
   */
 void PT6312_DVP630::cls() {
-  PT6312::cls();
   
-  //clear local buffer
+#if(0)
+  //clear local buffer (including Icons)
   for (int idx=0; idx < (DVP630_NR_DIGITS*2); idx++) {
     _displaybuffer[idx] = 0x00;  
   }
-  
+#else
+  //clear local buffer (preserving Icons)
+  for (int idx=0; idx < DVP630_NR_DIGITS; idx++) {
+    _displaybuffer[(idx<<1)]     = _displaybuffer[(idx<<1)]     & LO(S_ICON_MSK);  
+    _displaybuffer[(idx<<1) + 1] = _displaybuffer[(idx<<1) + 1] & HI(S_ICON_MSK);      
+  }
+#endif  
+
+  writeData(_displaybuffer, (DVP630_NR_DIGITS*2));
+
   _column = 0;   
 }    
 
+/** Set Icon
+  *
+  * @param Icon icon Enums Icon has Digit position encoded in 16 MSBs, Icon pattern encoded in 16 LSBs
+  * @return none
+  */
+void PT6312_DVP630::setIcon(Icon icon) {
+  int addr, icn;
+
+   icn =        icon  & 0xFFFF;
+  addr = (icon >> 16) & 0xFFFF; 
+  addr = ((DVP630_NR_DIGITS-1) - addr) * 2;   
+    
+  //Save char...and set bits for icon to write
+  _displaybuffer[addr]   = _displaybuffer[addr]   | LO(icn);      
+  _displaybuffer[addr+1] = _displaybuffer[addr+1] | HI(icn);      
+  writeData(_displaybuffer, (DVP630_NR_DIGITS*2));
+}
+
+/** Clr Icon
+  *
+  * @param Icon icon Enums Icon has Digit position encoded in 16 MSBs, Icon pattern encoded in 16 LSBs
+  * @return none
+  */
+void PT6312_DVP630::clrIcon(Icon icon) {
+  int addr, icn;
+
+   icn =        icon  & 0xFFFF;
+  addr = (icon >> 16) & 0xFFFF; 
+  addr = ((DVP630_NR_DIGITS-1) - addr) * 2;   
+    
+  //Save char...and clr bits for icon to write
+  _displaybuffer[addr]   = _displaybuffer[addr]   & ~LO(icn);      
+  _displaybuffer[addr+1] = _displaybuffer[addr+1] & ~HI(icn);      
+  writeData(_displaybuffer, (DVP630_NR_DIGITS*2));
+}
+
+
+/** Set User Defined Characters (UDC)
+  *
+  * @param unsigned char udc_idx  The Index of the UDC (0..7)
+  * @param int udc_data           The bitpattern for the UDC (16 bits)       
+  */
+void PT6312_DVP630::setUDC(unsigned char udc_idx, int udc_data) {
+
+  //Sanity check
+  if (udc_idx > (DVP630_NR_UDC-1)) {
+    return;
+  }
+  // Mask out Icon bits?
+
+  _UDC_16S[udc_idx][0] = LO(udc_data);
+  _UDC_16S[udc_idx][1] = HI(udc_data);
+}
 
 /** Write a single character (Stream implementation)
   */
 int PT6312_DVP630::_putc(int value) {
   int addr;
     
-    if (value == '\n') {
+    if ((value == '\n') || (value == '\r')) {
       //No character to write
       
       //Update Cursor      
       _column = 0;
     }
-//    else if ((value >= 0) && (value <= 7)) {
-//      //write UDC
-//      //@todo
-//    }  
-    else if ((value >= FONT_16S_START) && (value <= FONT_16S_END)) {   
+    else if ((value >= 0) && (value < DVP630_NR_UDC)) {
       //Character to write
-      value = value - FONT_16S_START;
-      addr = ((DVP630_NR_DIGITS-1) - _column) * 2; 
+      addr = ((DVP630_NR_DIGITS - 1) - _column) * 2; 
       
-//save icons...
-      _displaybuffer[addr]   = FONT_16S[value][0];      
-      _displaybuffer[addr+1] = FONT_16S[value][1];      
+      //Save icons...and set bits for character to write
+      _displaybuffer[addr]   = (_displaybuffer[addr]   & LO(S_ICON_MSK)) | _UDC_16S[value][0];      
+      _displaybuffer[addr+1] = (_displaybuffer[addr+1] & HI(S_ICON_MSK)) | _UDC_16S[value][1];      
       writeData(_displaybuffer, (DVP630_NR_DIGITS*2));
                
       //Update Cursor
       _column++;
-      if (_column >= columns()) {
+      if (_column > (DVP630_NR_DIGITS - 1)) {
+        _column = 0;
+      }          
+    }  
+    else if ((value >= FONT_16S_START) && (value <= FONT_16S_END)) {   
+      //Character to write
+      value = value - FONT_16S_START;
+      addr = ((DVP630_NR_DIGITS - 1) - _column) * 2; 
+      
+      //Save icons...and set bits for character to write
+      _displaybuffer[addr]   = (_displaybuffer[addr]   & LO(S_ICON_MSK)) | FONT_16S[value][0];      
+      _displaybuffer[addr+1] = (_displaybuffer[addr+1] & HI(S_ICON_MSK)) | FONT_16S[value][1];      
+      writeData(_displaybuffer, (DVP630_NR_DIGITS*2));
+               
+      //Update Cursor
+      _column++;
+      if (_column > (DVP630_NR_DIGITS - 1)) {
         _column = 0;
       }          
     } //else
 
-//    //Set next memoryaddress, make sure cursor blinks at next location
-//    addr = getAddress(_column, _row);
-//    _writeCommand(0x80 | addr);
-            
     return value;
 }
 
