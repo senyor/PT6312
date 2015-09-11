@@ -35,15 +35,15 @@
  * #include "mbed.h"
  * #include "PT6312.h" 
  * 
- * DisplayData_t size is 8 bytes (4 digits max 16 segments) ... 22 bytes (11 digits at max 11 segments) 
- * DisplayData_t size default is 14 bytes (7 digits max 15 segments) 
+ * DisplayData_t size is 8 bytes (4 digits @ segments) ... 22 bytes (11 digits @ 11 segments) 
+ * DisplayData_t size default is 14 bytes (7 digits @ 15 segments) 
  * PT6312::DisplayData_t mbed_str = {0xDA,0x00, 0x7C,0x00, 0x3C,0x01, 0xF6,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00};  
  * PT6312::DisplayData_t all_str  = {0xFF,0x0F, 0xFF,0x0F, 0xFF,0x0F, 0xFF,0x0F, 0xFF,0x0F, 0xFF,0x0F, 0xFF,0x0F};  
  *
  * // KeyData_t size is 3 bytes  
  * PT6312::KeyData_t keydata; 
  *
- * // PT6191 declaration, Default setting x Digits, y Segments
+ * // PT6191 declaration, Default setting 7 Digits @ 15 Segments
  * PT6312 PT6312(p5,p6,p7, p8);
  *
  * int main() {
@@ -79,7 +79,7 @@
  * // KeyData_t size is 3 bytes  
  * PT6312::KeyData_t keydata; 
  *
- * // PT6312_DVD declaration (7 Digits, 15 Segments)
+ * // PT6312_DVD declaration (7 Digits @ 15 Segments)
  * PT6312_DVP630 DVP630(p5,p6,p7, p8);
  *
  * int main() {
